@@ -10,4 +10,6 @@ dependencies = [
     "marimo>=0.18.4",
     "numpy>=2.4.0",
     "polars>=1.36.1",
+    "pyzmq>=27.1.0",
+    "yfinance>=1.0",
 ]
