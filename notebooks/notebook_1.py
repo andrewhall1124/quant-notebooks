@@ -7,7 +7,24 @@ app = marimo.App()
 @app.cell
 def _(mo):
     mo.md(r"""
-    # Intro
+    # Returns and Portfolio Optimization
+    In this notebook we will illustrate the foundational components of portfolio management and discuss the following topics:
+    - Return distributions (mean and volatility)
+    - Sharpe ratios
+    - Single stock portfolios
+    - Minimum variance portfolios
+    - Tangent portfolios
+    - The Capital Allocation Line
+    """)
+    return
+
+
+@app.cell
+def _(mo):
+    mo.md(r"""
+    ## Part 0: Setup
+
+    First we need to import the necessary packages and create a random number generator.
     """)
     return
 
@@ -23,14 +40,6 @@ def _():
 
 
 @app.cell
-def _(mo):
-    mo.md(r"""
-    # Part 1: We can think about stock returns as being sampled from a distribution.
-    """)
-    return
-
-
-@app.cell
 def _(np):
     seed = 42
     rng = np.random.default_rng(seed=seed)
@@ -38,21 +47,30 @@ def _(np):
 
 
 @app.cell
+def _(mo):
+    mo.md(r"""
+    ## Part 1: Distributions of Returns
+
+    - We generally characterize stock return performance in terms of mean and standard deviation.
+    - We will illustrate this as a synthetic security with mean 15bps and standard deviation 150bps (daily returns).
+    """)
+    return
+
+
+@app.cell
 def _():
-    mean = 0.0013  # 13bs per da
-    stdev = 0.0141  # 141bps per day
+    mean = 0.0015  # 15bs per day
+    stdev = 0.0150  # 150bps per day
     n = 252 * 1
     return mean, n, stdev
 
 
 @app.cell
-def _(mean, n, np, rng, stdev):
+def _(mean, n, np, pl, rng, stdev):
+    # Sample returns from normal distribution
     returns_np = np.array([rng.normal() * stdev + mean for _ in range(n)])
-    return (returns_np,)
 
-
-@app.cell
-def _(pl, returns_np):
+    # Create a dataframe of returns and calculate cumulative returns
     returns_df = (
         pl.DataFrame({"return": returns_np})
         .with_row_index()
@@ -65,7 +83,15 @@ def _(pl, returns_np):
             .alias("cumulative_return")
         )
     )
-    return (returns_df,)
+    return returns_df, returns_np
+
+
+@app.cell
+def _(mo):
+    mo.md(r"""
+    ### Daily Returns Distribution of Synthetic Asset
+    """)
+    return
 
 
 @app.cell
@@ -77,6 +103,17 @@ def _(alt, returns_df):
             x=alt.X("return", title="Return", bin=alt.Bin(maxbins=100)), y="count()"
         )
     )
+    return
+
+
+@app.cell
+def _(mo):
+    mo.md(r"""
+    ### Cumulative Performance of Synthetic Asset
+    - We can annualize daily returns by multiplying by 252
+    - We can annualize daily volatilities by multiplying by the square root of 252
+    - The foundational measure of performance is the Sharpe Ratio which is equivalent to:
+    """)
     return
 
 
@@ -102,6 +139,15 @@ def _(np, returns_np):
     print(f"Return: {annual_return:.2%}")
     print(f"Volatility: {annual_volatility:.2%}")
     print(f"Sharpe: {annual_sharpe:.2f}")
+    return
+
+
+@app.cell
+def _(mo):
+    mo.md(r"""
+    ### AAPL Stock Returns
+    To prove our point we will illustrate the same process but use historical prices for AAPL from 2024-01-01 to 2024-12-31
+    """)
     return
 
 
@@ -136,6 +182,14 @@ def _(pl, yf):
 
 
 @app.cell
+def _(mo):
+    mo.md(r"""
+    ### Daily Returns Distribution of AAPL
+    """)
+    return
+
+
+@app.cell
 def _(aapl_df, alt):
     (
         alt.Chart(aapl_df)
@@ -144,6 +198,14 @@ def _(aapl_df, alt):
             x=alt.X("return", title="Return", bin=alt.Bin(maxbins=100)), y="count()"
         )
     )
+    return
+
+
+@app.cell
+def _(mo):
+    mo.md(r"""
+    ### Cumulative Performance of AAPL
+    """)
     return
 
 
@@ -177,7 +239,11 @@ def _(aapl_df, np):
 @app.cell
 def _(mo):
     mo.md(r"""
-    # Part 2: Portfolios allow us to create new assets.
+    # Part 2: Portfolios
+    - We will now look at how combining assets into portfolios allows us to create new assets.
+    - For our examples we will considers that included AAPL, IBM, WMT, and VZ.
+    - We will compare each portfolio in terms of it's annualized return and volatility.
+    - This will involve plotting each portfolio in risk and return space.
     """)
     return
 
@@ -218,6 +284,14 @@ def _(pl, yf):
 
 
 @app.cell
+def _(mo):
+    mo.md(r"""
+    ### Cumulative Performance of Single Stock Portfolios
+    """)
+    return
+
+
+@app.cell
 def _(alt, stocks_df):
     (
         alt.Chart(stocks_df)
@@ -233,6 +307,7 @@ def _(alt, stocks_df):
 
 @app.cell
 def _(np, pl, stocks_df):
+    # Compute performance of single stock portfolios
     single_stock_portfolios = (
         stocks_df.group_by("ticker")
         .agg(
@@ -264,8 +339,27 @@ def _(alt, pl):
 
 
 @app.cell
+def _(mo):
+    mo.md(r"""
+    ### Single Stock Portfolios
+    """)
+    return
+
+
+@app.cell
 def _(plot_portfolios, single_stock_portfolios):
     plot_portfolios([single_stock_portfolios])
+    return
+
+
+@app.cell
+def _(mo):
+    mo.md(r"""
+    ### Expected Returns and Covariances
+    - In order to compute the portfolio level return and volatility we need two components.
+    - Expected Returns Vector: we will use the average of historical returns as a naive forecast of future returns.
+    - Covariance Matrix: we will use the historical covariances of returns as a naive forecast of future covariances.
+    """)
     return
 
 
@@ -284,6 +378,16 @@ def _(np, pl, stocks_df):
         .T
     )
     return covariance_matrix, expected_returns
+
+
+@app.cell
+def _(mo):
+    mo.md(r"""
+    ### Random Portfolios
+    - We will illustrate some of the potential portfolios we can create from our selected universe using random portfolios weight.
+    - One constraint we will impose is that our portfolios are fully invested meaning that the weights sum to one.
+    """)
+    return
 
 
 @app.cell
@@ -317,6 +421,16 @@ def _(covariance_matrix, expected_returns, np, pl, rng, tickers):
 @app.cell
 def _(plot_portfolios, random_portfolios, single_stock_portfolios):
     plot_portfolios([single_stock_portfolios, random_portfolios])
+    return
+
+
+@app.cell
+def _(mo):
+    mo.md(r"""
+    ### Minimum Variance Portfolios
+    - Now we will optimize each of our random portfolios by running the expected returns vector and covariance matrix through an optimizer.
+    - Our object is to minimize the variance of the portfolio, and our constraints are that the expected return of the portfolio remains the same.
+    """)
     return
 
 
@@ -390,6 +504,16 @@ def _(
 
 
 @app.cell
+def _(mo):
+    mo.md(r"""
+    ### Tangent Portfolio
+    - Now we will find the optimal portfolio among our universe.
+    - We can do this by matrix multiplying the inverse covariance matrix by the excess returns (expected returns minus risk free rate)
+    """)
+    return
+
+
+@app.cell
 def _(covariance_matrix, expected_returns, np, pl):
     # Assume a risk free rate of 5% annually
     risk_free_rate = .05
@@ -445,6 +569,16 @@ def _(
 
 
 @app.cell
+def _(mo):
+    mo.md(r"""
+    ### Capital Allocation Line (CAL)
+    - The rational investor would invest in the tangent portfolio and tilt towards or away from it by levering in and out of the risk free rate.
+    - We can approximate this by creating a line that connects the risk free rate portfolio (y-intercept) to the tangent portfolio.
+    """)
+    return
+
+
+@app.cell
 def _(np, pl, risk_free_rate, tangent_return, tangent_volatility):
     # Create CAL line passing through risk-free rate and tangent portfolio
     slope = (tangent_return - risk_free_rate) / tangent_volatility
@@ -482,6 +616,17 @@ def _(
             tangent_portfolio
         ]
     )
+    return
+
+
+@app.cell
+def _(mo):
+    mo.md(r"""
+    ### Maximum Utility Portfolio
+    - In practice it can be computationally expensive to invert large covariance matrices, so we use a different objective function in our optimizer: utility.
+    - Our utility function is constructed as:
+    - Note that our maximum utility portfolio is very close to the capital allocation line.
+    """)
     return
 
 
@@ -552,11 +697,6 @@ def _(
             max_utility_portfolio
         ]
     )
-    return
-
-
-@app.cell
-def _():
     return
 
 
