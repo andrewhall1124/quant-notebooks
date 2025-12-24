@@ -5,6 +5,12 @@ app = marimo.App()
 
 
 @app.cell
+def _():
+    import marimo as mo
+    return (mo,)
+
+
+@app.cell
 def _(mo):
     mo.md(r"""
     # Returns and Portfolio Optimization
@@ -58,17 +64,26 @@ def _(mo):
 
 
 @app.cell
-def _():
-    mean = 0.0015  # 15bs per day
-    stdev = 0.0150  # 150bps per day
-    n = 252 * 1
+def _(mo):
+    mean_slider = mo.ui.slider(start=-20, stop=20, step=1, label="Mean (bps)", value=15, show_value=True)
+    stdev_slider = mo.ui.slider(start=0, stop=200, step=1, label="Standard Deviation (bps)", value=150, show_value=True)
+
+    mo.vstack([mean_slider, stdev_slider])
+    return mean_slider, stdev_slider
+
+
+@app.cell
+def _(mean_slider, stdev_slider):
+    mean = mean_slider.value / (100 ** 2)
+    stdev = stdev_slider.value / (100 ** 2)
+    n = 252
     return mean, n, stdev
 
 
 @app.cell
 def _(mean, n, np, pl, rng, stdev):
     # Sample returns from normal distribution
-    returns_np = np.array([rng.normal() * stdev + mean for _ in range(n)])
+    returns_np = np.array([rng.normal() * stdev  + mean for _ in range(n)])
 
     # Create a dataframe of returns and calculate cumulative returns
     returns_df = (
@@ -109,6 +124,94 @@ def _(alt, returns_df):
 @app.cell
 def _(mo):
     mo.md(r"""
+    ### Sampling k paths from synthetic returns distribution
+    """)
+    return
+
+
+@app.cell
+def _(mean, n, np, pl, rng, stdev):
+    k = 20
+    # Sample k paths
+    returns_sample_df_list = []
+    for i in range(k):
+        # Sample returns from normal distribution
+        returns_sample_np = np.array([rng.normal() * stdev  + mean for _ in range(n)])
+
+        # Create a dataframe of returns and calculate cumulative returns
+        returns_sample_df_list.append(
+            pl.DataFrame({"return": returns_sample_np})
+            .with_row_index()
+            .with_columns(
+                pl.col("return")
+                .add(1)
+                .cum_prod()
+                .sub(1)
+                .mul(100)
+                .alias("cumulative_return")
+            )
+            .with_columns(
+                pl.lit(i).cast(pl.String).alias('k')
+            )
+        )
+
+    # Concat
+    returns_sample_df = pl.concat(returns_sample_df_list)
+    return (returns_sample_df,)
+
+
+@app.cell
+def _():
+    # # Find mean path
+    # returns_sample_mean_df = (
+    #     returns_sample_df
+    #     .group_by('index')
+    #     .agg(
+    #         pl.col('return').mean(),
+    #         pl.col('cumulative_return').mean()
+    #     )
+    #     .with_columns(
+    #         pl.lit('Mean').alias('k')
+    #     )
+    #     .sort('index')
+    # )
+    return
+
+
+@app.cell
+def _(alt, pl, returns_sample_df):
+    (
+        alt.Chart(pl.concat([returns_sample_df]))
+        .mark_line()
+        .encode(
+            x=alt.X("index", title=""),
+            y=alt.Y("cumulative_return", title="Cumulative Return"),
+            color=alt.Color("k")
+        )
+    )
+    return
+
+
+@app.cell
+def _(mo, pl, returns_sample_df):
+    returns_sample_means = returns_sample_df.group_by('k').agg(pl.col('return').mean().alias('mean_return'))
+    returns_sample_stdevs = returns_sample_df.group_by('k').agg(pl.col('return').std().alias('stdev_return'))
+
+    average_mean = returns_sample_means['mean_return'].mean()
+    average_stdev = returns_sample_stdevs['stdev_return'].mean()
+
+    mo.md(
+    f"""
+    - Average Mean Return: {average_mean * 100 ** 2:.0f} bps
+    - Average Standard Deviation of Returns: {average_stdev * 100 ** 2:.0f} bps
+    """
+    )
+    return
+
+
+@app.cell
+def _(mo):
+    mo.md(r"""
     ### Cumulative Performance of Synthetic Asset
     - We can annualize daily returns by multiplying by 252
     - We can annualize daily volatilities by multiplying by the square root of 252
@@ -131,14 +234,18 @@ def _(alt, returns_df):
 
 
 @app.cell
-def _(np, returns_np):
+def _(mo, np, returns_np):
     annual_return = returns_np.mean() * 252
     annual_volatility = returns_np.std() * np.sqrt(252)
     annual_sharpe = annual_return / annual_volatility
 
-    print(f"Return: {annual_return:.2%}")
-    print(f"Volatility: {annual_volatility:.2%}")
-    print(f"Sharpe: {annual_sharpe:.2f}")
+    mo.md(
+    f"""
+    - Return: {annual_return:.2%}
+    - Volatility: {annual_volatility:.2%}
+    - Sharpe: {annual_sharpe:.2f}
+    """
+    )
     return
 
 
@@ -599,7 +706,6 @@ def _(np, pl, risk_free_rate, tangent_return, tangent_volatility):
 @app.cell
 def _(
     cal_line_portfolios,
-    max_utility_portfolio,
     min_variance_portfolios,
     plot_portfolios,
     random_portfolios,
@@ -611,90 +717,8 @@ def _(
             single_stock_portfolios,
             random_portfolios,
             min_variance_portfolios,
-            max_utility_portfolio,
             cal_line_portfolios,
             tangent_portfolio
-        ]
-    )
-    return
-
-
-@app.cell
-def _(mo):
-    mo.md(r"""
-    ### Maximum Utility Portfolio
-    - In practice it can be computationally expensive to invert large covariance matrices, so we use a different objective function in our optimizer: utility.
-    - Our utility function is constructed as:
-    - Note that our maximum utility portfolio is very close to the capital allocation line.
-    """)
-    return
-
-
-@app.cell
-def _(cp, np):
-    def maximum_utility(
-        expected_returns: np.ndarray, covariance_matrix: np.ndarray, lambda_: float = 2
-    ) -> np.ndarray:
-        weights = cp.Variable(len(expected_returns))
-
-        objective = cp.Maximize(
-            weights.T @ expected_returns
-            - (lambda_ / 2) * cp.quad_form(weights, covariance_matrix)
-        )
-
-        constraints = [
-            cp.sum(weights) == 1,
-        ]
-
-        problem = cp.Problem(objective, constraints)
-        problem.solve()
-
-        return weights.value
-    return (maximum_utility,)
-
-
-@app.cell
-def _(covariance_matrix, expected_returns, maximum_utility, np, pl):
-    max_utility_weights = maximum_utility(
-        expected_returns, covariance_matrix, lambda_=100
-    )
-
-    max_utility_return = max_utility_weights.T @ expected_returns * 252
-    max_utility_volatility = np.sqrt(
-        max_utility_weights.T @ covariance_matrix @ max_utility_weights
-    ) * np.sqrt(252)
-
-    max_utility_portfolio = pl.DataFrame(
-        [
-            {
-                "ticker": "Maximum Utility",
-                "mean_return": max_utility_return,
-                "volatility": max_utility_volatility,
-            }
-        ]
-    )
-    return (max_utility_portfolio,)
-
-
-@app.cell
-def _(
-    cal_line_portfolios,
-    max_utility_portfolio,
-    min_variance_portfolios,
-    plot_portfolios,
-    random_portfolios,
-    single_stock_portfolios,
-    tangent_portfolio,
-):
-    plot_portfolios(
-        [
-            single_stock_portfolios,
-            random_portfolios,
-            min_variance_portfolios,
-            max_utility_portfolio,
-            cal_line_portfolios,
-            tangent_portfolio,
-            max_utility_portfolio
         ]
     )
     return
