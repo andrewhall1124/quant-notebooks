@@ -125,13 +125,16 @@ def _(alt, returns_df):
 def _(mo):
     mo.md(r"""
     ### Sampling k paths from synthetic returns distribution
+    - Here we will sample from our same distribution k times and plot each return series.
+    - Note that even though each series is sampled from the same distribution, they have very different outcomes.
+    - Returns are path dependent.
     """)
     return
 
 
 @app.cell
 def _(mean, n, np, pl, rng, stdev):
-    k = 20
+    k = 10
     # Sample k paths
     returns_sample_df_list = []
     for i in range(k):
@@ -161,24 +164,6 @@ def _(mean, n, np, pl, rng, stdev):
 
 
 @app.cell
-def _():
-    # # Find mean path
-    # returns_sample_mean_df = (
-    #     returns_sample_df
-    #     .group_by('index')
-    #     .agg(
-    #         pl.col('return').mean(),
-    #         pl.col('cumulative_return').mean()
-    #     )
-    #     .with_columns(
-    #         pl.lit('Mean').alias('k')
-    #     )
-    #     .sort('index')
-    # )
-    return
-
-
-@app.cell
 def _(alt, pl, returns_sample_df):
     (
         alt.Chart(pl.concat([returns_sample_df]))
@@ -202,6 +187,8 @@ def _(mo, pl, returns_sample_df):
 
     mo.md(
     f"""
+    Note that the average mean return of across series is approximately equal to the population mean, 
+    and the average standard deviation of returns across series is approximately equal to the population standard deviation.
     - Average Mean Return: {average_mean * 100 ** 2:.0f} bps
     - Average Standard Deviation of Returns: {average_stdev * 100 ** 2:.0f} bps
     """
@@ -216,6 +203,11 @@ def _(mo):
     - We can annualize daily returns by multiplying by 252
     - We can annualize daily volatilities by multiplying by the square root of 252
     - The foundational measure of performance is the Sharpe Ratio which is equivalent to:
+    $$\text{Sharpe Ratio} = \frac{\text{Annual Return}}{\text{Annual Volatility}} = \frac{\mu_{annual}}{\sigma_{annual}}$$
+
+    Where:
+    - $\mu_{annual} = \bar{r}_{daily} \times 252$ (annualized mean return)
+    - $\sigma_{annual} = \sigma_{daily} \times \sqrt{252}$ (annualized volatility)
     """)
     return
 
