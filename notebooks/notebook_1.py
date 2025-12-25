@@ -65,8 +65,17 @@ def _(mo):
 
 @app.cell
 def _(mo):
-    mean_slider = mo.ui.slider(start=-20, stop=20, step=1, label="Mean (bps)", value=15, show_value=True)
-    stdev_slider = mo.ui.slider(start=0, stop=200, step=1, label="Standard Deviation (bps)", value=150, show_value=True)
+    mean_slider = mo.ui.slider(
+        start=-15, stop=45, step=5, label="Mean (bps)", value=15, show_value=True
+    )
+    stdev_slider = mo.ui.slider(
+        start=0,
+        stop=300,
+        step=10,
+        label="Standard Deviation (bps)",
+        value=150,
+        show_value=True,
+    )
 
     mo.vstack([mean_slider, stdev_slider])
     return mean_slider, stdev_slider
@@ -74,8 +83,8 @@ def _(mo):
 
 @app.cell
 def _(mean_slider, stdev_slider):
-    mean = mean_slider.value / (100 ** 2)
-    stdev = stdev_slider.value / (100 ** 2)
+    mean = mean_slider.value / (100**2)
+    stdev = stdev_slider.value / (100**2)
     n = 252
     return mean, n, stdev
 
@@ -83,7 +92,7 @@ def _(mean_slider, stdev_slider):
 @app.cell
 def _(mean, n, np, pl, rng, stdev):
     # Sample returns from normal distribution
-    returns_np = np.array([rng.normal() * stdev  + mean for _ in range(n)])
+    returns_np = np.array([rng.normal() * stdev + mean for _ in range(n)])
 
     # Create a dataframe of returns and calculate cumulative returns
     returns_df = (
@@ -115,7 +124,10 @@ def _(alt, returns_df):
         alt.Chart(returns_df)
         .mark_bar()
         .encode(
-            x=alt.X("return", title="Return", bin=alt.Bin(maxbins=100)), y="count()"
+            x=alt.X("return", title="Return")
+            .bin(extent=[-0.1, 0.1], step=0.01)
+            .scale(domain=(-0.1, 0.1)),
+            y="count()",
         )
     )
     return
@@ -139,7 +151,7 @@ def _(mean, n, np, pl, rng, stdev):
     returns_sample_df_list = []
     for i in range(k):
         # Sample returns from normal distribution
-        returns_sample_np = np.array([rng.normal() * stdev  + mean for _ in range(n)])
+        returns_sample_np = np.array([rng.normal() * stdev + mean for _ in range(n)])
 
         # Create a dataframe of returns and calculate cumulative returns
         returns_sample_df_list.append(
@@ -153,9 +165,7 @@ def _(mean, n, np, pl, rng, stdev):
                 .mul(100)
                 .alias("cumulative_return")
             )
-            .with_columns(
-                pl.lit(i).cast(pl.String).alias('k')
-            )
+            .with_columns(pl.lit(i).cast(pl.String).alias("k"))
         )
 
     # Concat
@@ -171,7 +181,7 @@ def _(alt, pl, returns_sample_df):
         .encode(
             x=alt.X("index", title=""),
             y=alt.Y("cumulative_return", title="Cumulative Return"),
-            color=alt.Color("k")
+            color=alt.Color("k"),
         )
     )
     return
@@ -179,18 +189,22 @@ def _(alt, pl, returns_sample_df):
 
 @app.cell
 def _(mo, pl, returns_sample_df):
-    returns_sample_means = returns_sample_df.group_by('k').agg(pl.col('return').mean().alias('mean_return'))
-    returns_sample_stdevs = returns_sample_df.group_by('k').agg(pl.col('return').std().alias('stdev_return'))
+    returns_sample_means = returns_sample_df.group_by("k").agg(
+        pl.col("return").mean().alias("mean_return")
+    )
+    returns_sample_stdevs = returns_sample_df.group_by("k").agg(
+        pl.col("return").std().alias("stdev_return")
+    )
 
-    average_mean = returns_sample_means['mean_return'].mean()
-    average_stdev = returns_sample_stdevs['stdev_return'].mean()
+    average_mean = returns_sample_means["mean_return"].mean()
+    average_stdev = returns_sample_stdevs["stdev_return"].mean()
 
     mo.md(
-    f"""
+        f"""
     Note that the average mean return of across series is approximately equal to the population mean, 
     and the average standard deviation of returns across series is approximately equal to the population standard deviation.
-    - Average Mean Return: {average_mean * 100 ** 2:.0f} bps
-    - Average Standard Deviation of Returns: {average_stdev * 100 ** 2:.0f} bps
+    - Average Mean Return: {average_mean * 100**2:.0f} bps
+    - Average Standard Deviation of Returns: {average_stdev * 100**2:.0f} bps
     """
     )
     return
@@ -203,8 +217,11 @@ def _(mo):
     - We can annualize daily returns by multiplying by 252
     - We can annualize daily volatilities by multiplying by the square root of 252
     - The foundational measure of performance is the Sharpe Ratio which is equivalent to:
-    $$\text{Sharpe Ratio} = \frac{\text{Annual Return}}{\text{Annual Volatility}} = \frac{\mu_{annual}}{\sigma_{annual}}$$
-
+    <br>
+    <br>
+    $\text{Sharpe Ratio} = \frac{\text{Annual Return}}{\text{Annual Volatility}} = \frac{\mu_{annual}}{\sigma_{annual}}$
+    <br>
+    <br>
     Where:
     - $\mu_{annual} = \bar{r}_{daily} \times 252$ (annualized mean return)
     - $\sigma_{annual} = \sigma_{daily} \times \sqrt{252}$ (annualized volatility)
@@ -232,7 +249,7 @@ def _(mo, np, returns_np):
     annual_sharpe = annual_return / annual_volatility
 
     mo.md(
-    f"""
+        f"""
     - Return: {annual_return:.2%}
     - Volatility: {annual_volatility:.2%}
     - Sharpe: {annual_sharpe:.2f}
@@ -294,7 +311,10 @@ def _(aapl_df, alt):
         alt.Chart(aapl_df)
         .mark_bar()
         .encode(
-            x=alt.X("return", title="Return", bin=alt.Bin(maxbins=100)), y="count()"
+            x=alt.X("return", title="Return")
+            .bin(extent=[-0.1, 0.1], step=0.01)
+            .scale(domain=(-0.1, 0.1)),
+            y="count()",
         )
     )
     return
@@ -322,16 +342,20 @@ def _(aapl_df, alt):
 
 
 @app.cell
-def _(aapl_df, np):
+def _(aapl_df, mo, np):
     aapl_returns_np = aapl_df["return"].to_numpy()
 
     annual_aapl_return = aapl_returns_np.mean() * 252
     annual_aapl_volatility = aapl_returns_np.std() * np.sqrt(252)
     annual_aapl_sharpe = annual_aapl_return / annual_aapl_volatility
 
-    print(f"Return: {annual_aapl_return:.2%}")
-    print(f"Volatility: {annual_aapl_volatility:.2%}")
-    print(f"Sharpe: {annual_aapl_sharpe:.2f}")
+    mo.md(
+        f"""
+    - Return: {annual_aapl_return:.2%}
+    - Volatility: {annual_aapl_volatility:.2%}
+    - Sharpe: {annual_aapl_sharpe:.2f}
+    """
+    )
     return
 
 
@@ -615,7 +639,7 @@ def _(mo):
 @app.cell
 def _(covariance_matrix, expected_returns, np, pl):
     # Assume a risk free rate of 5% annually
-    risk_free_rate = .05
+    risk_free_rate = 0.05
 
     # Compute the excess returns and convert to daily
     excess_returns = expected_returns - risk_free_rate / 252
@@ -635,11 +659,15 @@ def _(covariance_matrix, expected_returns, np, pl):
         tangent_weights.T @ covariance_matrix @ tangent_weights
     ) * np.sqrt(252)
 
-    tangent_portfolio = pl.DataFrame([{
-        'ticker': 'Tangent',
-        'mean_return': tangent_return,
-        'volatility': tangent_volatility,
-    }])
+    tangent_portfolio = pl.DataFrame(
+        [
+            {
+                "ticker": "Tangent",
+                "mean_return": tangent_return,
+                "volatility": tangent_volatility,
+            }
+        ]
+    )
     return (
         risk_free_rate,
         tangent_portfolio,
@@ -661,7 +689,7 @@ def _(
             single_stock_portfolios,
             random_portfolios,
             min_variance_portfolios,
-            tangent_portfolio
+            tangent_portfolio,
         ]
     )
     return
@@ -687,11 +715,13 @@ def _(np, pl, risk_free_rate, tangent_return, tangent_volatility):
     x = np.linspace(*bounds, 100)
     y = slope * x + intercept
 
-    cal_line_portfolios = pl.DataFrame({
-        'ticker': ['CAL'] * 100,
-        'mean_return': y,
-        'volatility': x,
-    })
+    cal_line_portfolios = pl.DataFrame(
+        {
+            "ticker": ["CAL"] * 100,
+            "mean_return": y,
+            "volatility": x,
+        }
+    )
     return (cal_line_portfolios,)
 
 
@@ -710,7 +740,7 @@ def _(
             random_portfolios,
             min_variance_portfolios,
             cal_line_portfolios,
-            tangent_portfolio
+            tangent_portfolio,
         ]
     )
     return
